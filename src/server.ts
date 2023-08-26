@@ -21,7 +21,6 @@ app.use(bodyParser.urlencoded({extended: false}));
 
 
 const validate = (req, res, next) => {
-  console.log(req)
   if(!Array.isArray(req.body.languages) || req.body.languages.length === 0) 
     return res.status(400).send('Seleziona almeno una lingua in cui tradurre.')
 

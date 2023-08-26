@@ -5,12 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Translation Form</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.16/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .loader {
+          border: 4px solid #f3f3f3; /* Light grey */
+          border-top: 4px solid rgb(79 70 229); /* Blue */
+          border-radius: 50%;
+          width: 90px;
+          height: 90px;
+          animation: spin 1.6s linear infinite;
+        }
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        </style>
 </head>
 <body class="p-10 h-screen bg-gray-300 flex flex-col justify-start items-center" >
     <h1 class="text-3xl font-bold  mt-16">AI Translations in multiple languages, simultaneously!</h1>
     <h3 class="text-md mt-2 mb-8">Keeps format consistent. es. You can traduce the text inside HTML code and leaves the HTML unchanged.</h3>
     <form id="translationForm"  class="space-y-4 w-full" style="max-width: 700px;">
-
         <div>
             <label for="contextForTranslation" class="block text-sm font-medium text-gray-700">Context for translation (optional)</label>
             <textarea id="contextForTranslation" name="contextForTranslation" rows="3" class="p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 mt-1 block w-full sm:text-sm border-gray-300 rounded-md"></textarea>
@@ -72,8 +86,9 @@
             </button>
         </div>
     </form>
-    <div id="translationResult" class="mt-10"></div>
-    <dialog class="w-screen h-screen p-4 bg-black bg-opacity-50" id="modal">
+    <div id="loadingSpinner" class="loader hidden mt-10"></div>
+    <div id="translationResult" class="mt-10 w-full" style="max-width: 700px;"></div>
+    <dialog class="w-screen h-screen p-4 bg-black bg-opacity-50"  id="modal">
         <div class="w-full h-full flex justify-center items-center">
             <div class="bg-white rounded-lg">   
                 <div class="p-4">
@@ -103,7 +118,6 @@
     });
 
     saveButton.addEventListener('click', () => {
-        console.log('save and close')
         localStorage.setItem('openAIKey', apiKeyInput.value);
         modal.close();
     });
@@ -113,43 +127,59 @@
     });
 
     window.onload = () => {
-        console.log('here')
         const openAIApiKey = localStorage.getItem('openAIKey'); 
         if(!openAIApiKey || openAIApiKey === '') modal.showModal();
     }
 </script>
 <script>
     document.getElementById('translationForm').addEventListener('submit', function(event) {
-    event.preventDefault();
+        event.preventDefault();
 
-    let context = document.getElementById('contextForTranslation').value;
-    let textToTranslate = document.getElementById('textToTranslate').value;
-    let languages = Array.from(document.querySelectorAll('input[name="languages"]:checked')).map(el => el.value);
-    
-    fetch(`http://localhost:6069/translate`,
-        {
-            method: "POST",
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                context,
-                text: textToTranslate,
-                languages
-            }) 
-        })
-        .then(response => response.json())
-        .then(data => {
-            let resultDiv = document.getElementById('translationResult');
-            resultDiv.innerHTML = '';
-            for (let language in data) {
-                let translationBox = document.createElement('div');
-                translationBox.classList.add('p-4', 'border', 'border-gray-200',"bg-gray-50", 'rounded', 'mb-4');
-                translationBox.innerHTML = `<h2 class="font-bold text-lg">${language}</h2><p>${data[language]}</p>`;
-                resultDiv.appendChild(translationBox);
-            }
-        });
+        const resultDiv = document.getElementById('translationResult');
+        const spinner = document.getElementById("loadingSpinner");
+        
+        resultDiv.innerHTML = '';
+        spinner.classList.remove('hidden');
+
+        let context = document.getElementById('contextForTranslation').value;
+        let textToTranslate = document.getElementById('textToTranslate').value;
+        let languages = Array.from(document.querySelectorAll('input[name="languages"]:checked')).map(el => el.value);
+        const openAIApiKey = localStorage.getItem('openAIKey'); 
+
+        function escapeHtml(html) {
+            return html
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+        }
+
+        fetch(`http://localhost:6069/translate`,
+            {
+                method: "POST",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    context,
+                    text: textToTranslate,
+                    languages,
+                    apiKey: openAIApiKey
+                }) 
+            })
+            .then(response => response.json())
+            .then(data => {
+                spinner.classList.add('hidden');
+                resultDiv.innerHTML = '';
+                for (let language in data) {
+                    let translationBox = document.createElement('div');
+                    translationBox.classList.add('p-4', 'border', 'border-gray-200',"bg-gray-50", 'rounded', 'mb-4');
+                    translationBox.innerHTML = `<h2 class="font-bold text-lg">${language}</h2><p>${escapeHtml(data[language])}</p>`;
+                    resultDiv.appendChild(translationBox);
+                }
+            }).catch(err => {
+                spinner.classList.add('hidden');
+                alert('Ops, there was an error: ' + err)
+            })
     });
 </script>
 </html>
